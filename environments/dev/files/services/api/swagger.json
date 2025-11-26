@@ -28,7 +28,7 @@
                     }
                 },
                 "x-amazon-apigateway-integration": {
-                    "uri": "${nlb_dns}/healthcheck",
+                    "uri": "${nlb_dns}/healthcheck/admin",
                     "responses": {
                         "default": {
                         "statusCode": "200"
@@ -51,7 +51,15 @@
                             "application/json": "{\n    \"versions\": [\n        {\n            \"status\": \"CURRENT\",\n            \"updated\": \"2012-08-01T00:00:00Z\",\n            \"id\": \"v1.0\",\n            \"links\": [\n                {\n                    \"href\": \"http://23.253.228.211:8779/v1.0/\",\n                    \"rel\": \"self\"\n                }\n            ]\n        }\n    ]\n}"
                         }
                     }
-                }
+                },
+                "x-amazon-apigateway-integration": {
+                    "uri": "${nlb_dns}/nmb/admin/cs",
+                    "responses": {
+                        "default": {
+                        "statusCode": "200"
+                        }
+                    },
+              }
             }
         },
         "/v1.0/{accountId}/instances": {
