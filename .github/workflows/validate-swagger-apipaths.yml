@@ -1,0 +1,106 @@
+name: Check Swagger Admin URIs
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'pre-prod'
+      - 'develop'
+    paths:
+      - "environments/*/files/services/api/swagger.json"
+      - ".github/workflows/validate-swagger-apipaths.yml"
+
+  pull_request:
+    branches:
+      - 'main'
+      - 'pre-prod'
+      - 'develop'
+    paths:
+      - "environments/*/files/services/api/swagger.json"
+      - ".github/workflows/validate-swagger-apipaths.yml"
+
+jobs:
+  check-admin-uris:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, stg, prod]
+    permissions:
+      contents: read   # Required for repo access
+      pull-requests: write  # Required for posting comments on PRs
+      issues: write  # Required for updating PR comments
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Check for admin in API Gateway URIs
+        id: check
+        continue-on-error: true
+        run: |
+          FILE="environments/${{ matrix.environment }}/files/services/api/swagger.json"
+          if [ ! -f "$FILE" ]; then
+            echo "✅ No swagger file found for ${{ matrix.environment }}"
+            exit 0
+          fi
+          if grep -q '"x-amazon-apigateway-integration"' "$FILE"; then
+            if jq -e '.. | select(type == "object" and has("x-amazon-apigateway-integration")) | .["x-amazon-apigateway-integration"].uri | select(. != null and (. | tostring | test("admin"; "i")))' "$FILE" > /dev/null 2>&1; then
+              echo "❌ Error: Found 'admin' in API Gateway integration URI for ${{ matrix.environment }}"
+              URIS=$(jq -r '.. | select(type == "object" and has("x-amazon-apigateway-integration")) | .["x-amazon-apigateway-integration"].uri | select(. != null and (. | tostring | test("admin"; "i")))' "$FILE")
+              echo "admin_uris<<EOF" >> $GITHUB_OUTPUT
+              echo "$URIS" >> $GITHUB_OUTPUT
+              echo "EOF" >> $GITHUB_OUTPUT
+              echo "has_admin=true" >> $GITHUB_OUTPUT
+              exit 1
+            else
+              echo "✅ No 'admin' found in API Gateway integration URIs for ${{ matrix.environment }}"
+            fi
+          else
+            echo "✅ No API Gateway integrations found for ${{ matrix.environment }}"
+          fi
+      
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const envHeader = `## 🔍 Check for admin URI's within Swagger file - ${{ matrix.environment }}`;
+            const adminUris = '${{ steps.check.outputs.admin_uris }}';
+            const hasIssues = adminUris !== '';
+
+            const allComments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100
+            });
+
+            const existing = allComments.find(c => c.user && c.user.login === 'github-actions[bot]' && c.body && c.body.startsWith(envHeader));
+
+            if (hasIssues) {
+              const comment = `${envHeader}\n\n❌ **Validation Failed**\n\nFound 'admin' in API Gateway integration URIs:\n\`\`\`\n${adminUris}\n\`\`\`\n\nPlease remove admin paths from the API Gateway as they should not be publically accessible.`;
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body: comment
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: comment
+                });
+              }
+            } else if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: `${envHeader}\n\n✅ All issues fixed`
+              });
+            }
+      - name: Fail if admin found
+        if: steps.check.outputs.has_admin == 'true'
+        run: exit 1
