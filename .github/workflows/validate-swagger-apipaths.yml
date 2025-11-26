@@ -7,7 +7,7 @@ on:
       - 'pre-prod'
       - 'develop'
     paths:
-      - "environments/*/files/services/api/merged_api.json" # API spec file
+      - "environments/*/files/services/api/swagger.json" # API spec file
       - ".github/workflows/validate-swagger-apipaths.yml"
 
   pull_request:
@@ -16,7 +16,7 @@ on:
       - 'pre-prod'
       - 'develop'
     paths:
-      - "environments/*/files/services/api/merged_api.json" # API spec file
+      - "environments/*/files/services/api/swagger.json" # API spec file
       - ".github/workflows/validate-swagger-apipaths.yml"
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [dev, stg, uat, prod]
+        environment: [dev, stg, prod]
     permissions:
       contents: read   # Required for repo access
       pull-requests: write  # Required for posting comments on PRs
