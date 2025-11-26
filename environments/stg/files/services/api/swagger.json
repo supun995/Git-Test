@@ -72,7 +72,7 @@
                     }
                 },
                 "x-amazon-apigateway-integration": {
-                    "uri": "${nlb_dns}/mns/bank/healthcheck",
+                    "uri": "${nlb_dns}/mns/admin/bank/healthcheck",
                     "responses": {
                         "default": {
                         "statusCode": "200"
