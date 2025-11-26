@@ -1,4 +1,4 @@
-
+{
     "swagger": "2.0",
     "info": {
         "title": "dbaas",
@@ -75,10 +75,10 @@
                     "uri": "${nlb_dns}/mns/admin/bank/healthcheck",
                     "responses": {
                         "default": {
-                        "statusCode": "200"
+                            "statusCode": "200"
                         }
-                    },
-               }
+                    }
+                }
             },
             "get": {
                 "operationId": "getInstance",
@@ -460,4 +460,5 @@
             }
         }
     }
+}
 }
