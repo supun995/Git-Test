@@ -1,5 +1,4 @@
 name: Check Swagger Admin URIs
-
 on:
   push:
     branches:
