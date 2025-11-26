@@ -7,7 +7,7 @@ on:
       - 'pre-prod'
       - 'develop'
     paths:
-      - "environments/*/files/services/api/swagger.json" # API spec file
+      - "environments/*/files/services/api/swagger.json"
       - ".github/workflows/validate-swagger-apipaths.yml"
 
   pull_request:
@@ -16,7 +16,7 @@ on:
       - 'pre-prod'
       - 'develop'
     paths:
-      - "environments/*/files/services/api/swagger.json" # API spec file
+      - "environments/*/files/services/api/swagger.json"
       - ".github/workflows/validate-swagger-apipaths.yml"
 
 jobs:
