@@ -35,6 +35,7 @@ jobs:
       
       - name: Check for admin in API Gateway URIs
         id: check
+        continue-on-error: true
         run: |
           FILE="environments/${{ matrix.environment }}/files/services/api/swagger.json"
           if [ ! -f "$FILE" ]; then
@@ -48,6 +49,7 @@ jobs:
               echo "admin_uris<<EOF" >> $GITHUB_OUTPUT
               echo "$URIS" >> $GITHUB_OUTPUT
               echo "EOF" >> $GITHUB_OUTPUT
+              echo "has_admin=true" >> $GITHUB_OUTPUT
               exit 1
             else
               echo "✅ No 'admin' found in API Gateway integration URIs for ${{ matrix.environment }}"
@@ -55,6 +57,10 @@ jobs:
           else
             echo "✅ No API Gateway integrations found for ${{ matrix.environment }}"
           fi
+      
+      - name: Fail if admin found
+        if: steps.check.outputs.has_admin == 'true'
+        run: exit 1
 
       - name: Comment on PR
         if: github.event_name == 'pull_request'
