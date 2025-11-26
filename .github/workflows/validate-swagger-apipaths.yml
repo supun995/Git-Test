@@ -7,7 +7,7 @@ on:
       - 'pre-prod'
       - 'develop'
     paths:
-      - "enviroments/*/files/services/api/swagger.json"
+      - "environments/*/files/services/api/swagger.json"
       - ".github/workflows/validate-swagger-apipaths.yml"
 
   pull_request:
@@ -16,7 +16,7 @@ on:
       - 'pre-prod'
       - 'develop'
     paths:
-      - "enviroments/*/files/services/api/swagger.json"
+      - "environments/*/files/services/api/swagger.json"
       - ".github/workflows/validate-swagger-apipaths.yml"
 
 jobs:
@@ -37,7 +37,7 @@ jobs:
         id: check
         continue-on-error: true
         run: |
-          FILE="enviroments/${{ matrix.environment }}/files/services/api/swagger.json"
+          FILE="environments/${{ matrix.environment }}/files/services/api/swagger.json"
           if [ ! -f "$FILE" ]; then
             echo "✅ No swagger file found for ${{ matrix.environment }}"
             exit 0
