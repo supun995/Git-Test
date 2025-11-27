@@ -7,11 +7,6 @@ on:
         description: 'Path to swagger file to validate'
         required: true
         type: string
-      environment:
-        description: 'Environment name for validation'
-        required: false
-        default: 'external'
-        type: string
       pr_number:
         description: 'PR number for commenting (when called from upstream)'
         required: false
@@ -29,13 +24,6 @@ on:
 jobs:
   check-admin-uris:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment: ${{ github.event_name == 'workflow_call' && fromJson(format('["{}"]', inputs.environment)) || fromJson('["dev", "stg", "uat", "prod"]') }}
-    permissions:
-      contents: read   # Required for repo access
-      pull-requests: write  # Required for posting comments on PRs
-      issues: write  # Required for updating PR comments
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
