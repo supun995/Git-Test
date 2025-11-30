@@ -1,0 +1,99 @@
+name: "develop branch cicd frontend"
+
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        description: "NodeJS version to use"
+        required: false
+        type: string
+        default: 22
+      package_manager:
+        description: "Choose between npm, pnpm or yarn"
+        required: false
+        default: "npm"
+        type: string
+      build:
+        description: "Choose between true and false"
+        required: false
+        default: "true"
+        type: string
+      lint_mode:
+        description: "Choose between 'modified' or 'full'"
+        required: false
+        default: "full"
+        type: string
+
+
+jobs:
+  eslint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{inputs.node_version}}
+
+      - name: Run Yarn install
+        if: inputs.package_manager == 'yarn'
+        uses: borales/actions-yarn@v5
+        with:
+          cmd: install # will run `yarn install` command
+
+      - name: Build (Yarn)
+        if: inputs.package_manager == 'yarn' && inputs.build == 'true'
+        run: yarn build
+
+      - name: Install dependencies (NPM)
+        if: inputs.package_manager == 'npm'
+        run: npm ci
+
+      - name: Build (NPM)
+        if: inputs.package_manager == 'npm' && inputs.build == 'true'
+        run: npm run build
+
+      - name: Installing pnpm
+        uses: pnpm/action-setup@v4
+        if: inputs.package_manager == 'pnpm'
+        with:
+          version: 10
+
+      - name: Install dependencies (PNPM)
+        if: inputs.package_manager == 'pnpm'
+        run: pnpm install
+
+      - name: Build (PNPM)
+        if: inputs.package_manager == 'pnpm' && inputs.build == 'true'
+        run: pnpm build
+
+      - name: Get modified files
+        if: inputs.lint_mode == 'modified'
+        id: changed-files
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              per_page: 100
+            });
+            
+            const lintFiles = files
+              .filter(f => f.status !== 'removed')
+              .map(f => f.filename)
+              .filter(f => /\.(js|jsx|ts|tsx|vue)$/.test(f))
+              .join(' ');
+            
+            core.setOutput('files', lintFiles);
+            core.setOutput('has_files', lintFiles ? 'true' : 'false');
+      
+      - name: Verify code linting (ESLint - Modified Files)
+        if: inputs.lint_mode == 'modified' && steps.changed-files.outputs.has_files == 'true'
+        run: npx eslint ${{ steps.changed-files.outputs.files }} --max-warnings=0
+      
+      - name: Verify code linting (ESLint - Full Codebase)
+        if: inputs.lint_mode == 'full'
+        run: npx eslint . --max-warnings=0
