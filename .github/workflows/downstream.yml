@@ -3,8 +3,8 @@ name: Check Swagger Admin URIs
 on:
   workflow_call:
     inputs:
-      swagger_file_path:
-        description: 'Path to swagger file to validate'
+      swagger_file_paths:
+        description: 'Comma-separated paths to swagger files to validate'
         required: true
         type: string
       pr_number:
@@ -32,26 +32,45 @@ jobs:
         id: check
         continue-on-error: true
         run: |
-          FILE="${{ inputs.swagger_file_path }}"
-
-          if [ ! -f "$FILE" ]; then
-            echo "✅ No swagger file found: $FILE"
-            exit 0
-          fi
-          if grep -q '"x-amazon-apigateway-integration"' "$FILE"; then
-            if jq -e '.. | select(type == "object" and has("x-amazon-apigateway-integration")) | .["x-amazon-apigateway-integration"].uri | select(. != null and (. | tostring | test("admin"; "i")))' "$FILE" > /dev/null 2>&1; then
-              echo "❌ Error: Found 'admin' in API Gateway integration URI for ${{ matrix.environment }}"
-              URIS=$(jq -r '.. | select(type == "object" and has("x-amazon-apigateway-integration")) | .["x-amazon-apigateway-integration"].uri | select(. != null and (. | tostring | test("admin"; "i")))' "$FILE")
-              echo "admin_uris<<EOF" >> $GITHUB_OUTPUT
-              echo "$URIS" >> $GITHUB_OUTPUT
-              echo "EOF" >> $GITHUB_OUTPUT
-              echo "has_admin=true" >> $GITHUB_OUTPUT
-              exit 1
-            else
-              echo "✅ No 'admin' found in API Gateway integration URIs for ${{ matrix.environment }}"
+          IFS=',' read -ra FILES <<< "${{ inputs.swagger_file_paths }}"
+          ALL_URIS=""
+          HAS_ADMIN=false
+          
+          for FILE in "${FILES[@]}"; do
+            FILE=$(echo "$FILE" | xargs)
+            
+            if [ ! -f "$FILE" ]; then
+              echo "✅ No swagger file found: $FILE"
+              continue
             fi
-          else
-            echo "✅ No API Gateway integrations found for ${{ matrix.environment }}"
+            
+            echo "Checking file: $FILE"
+            
+            # Check x-amazon-apigateway-integration URIs
+            if grep -q '"x-amazon-apigateway-integration"' "$FILE"; then
+              if jq -e '.. | select(type == "object" and has("x-amazon-apigateway-integration")) | .["x-amazon-apigateway-integration"].uri | select(. != null and (. | tostring | test("admin"; "i")))' "$FILE" > /dev/null 2>&1; then
+                echo "❌ Error: Found 'admin' in API Gateway integration URI in $FILE"
+                URIS=$(jq -r '.. | select(type == "object" and has("x-amazon-apigateway-integration")) | .["x-amazon-apigateway-integration"].uri | select(. != null and (. | tostring | test("admin"; "i")))' "$FILE")
+                ALL_URIS="${ALL_URIS}File: $FILE (integration URIs)\n${URIS}\n\n"
+                HAS_ADMIN=true
+              fi
+            fi
+            
+            # Check path keys for admin
+            if jq -e '.paths | keys[] | select(test("admin"; "i"))' "$FILE" > /dev/null 2>&1; then
+              echo "❌ Error: Found 'admin' in API path in $FILE"
+              PATHS=$(jq -r '.paths | keys[] | select(test("admin"; "i"))' "$FILE")
+              ALL_URIS="${ALL_URIS}File: $FILE (API paths)\n${PATHS}\n\n"
+              HAS_ADMIN=true
+            fi
+          done
+          
+          if [ "$HAS_ADMIN" = true ]; then
+            echo "admin_uris<<EOF" >> $GITHUB_OUTPUT
+            echo -e "$ALL_URIS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "has_admin=true" >> $GITHUB_OUTPUT
+            exit 1
           fi
       
       - name: Comment on PR
@@ -61,7 +80,7 @@ jobs:
           ADMIN_URIS: ${{ steps.check.outputs.admin_uris }}
         with:
           script: |
-            const envHeader = `## 🔍 Check for admin URI's within Swagger file - ${{ matrix.environment }}`;
+            const envHeader = `## 🔍 Check for admin URI's within Swagger files`;
             const adminUris = process.env.ADMIN_URIS || '';
             const hasIssues = adminUris !== '';
 
